@@ -186,8 +186,13 @@ async def get_weather_forecast(discord_message: discord.Message, prompt: str, lo
     await discord_message.reply(f'{discord_message.author.mention} {forecast}', mention_author=True)
 
 async def summarise_webpage_content(discord_message: discord.Message, prompt: str, url: str) -> None:
-    logger.info(f"Summarising {url} with prompt: {prompt}")
-    summarised_text = await summary.get_text(url)
+    original_text = await summary.get_text(url)
+    if len(original_text) > 10000:
+        logger.info(f"Original text to summarise is too long, truncating to 10000 characters")
+        original_text = original_text[:10000]
+        was_truncated = True
+    else:
+        was_truncated = False
     prompt = prompt.replace("👀", "")
     prompt = prompt.strip()
     prompt = prompt.strip("<>")
@@ -198,11 +203,13 @@ async def summarise_webpage_content(discord_message: discord.Message, prompt: st
         },
         {
             'role': 'user',
-            'content': f'{prompt}? :: <text-to-summarise>\n\n{summarised_text}\n\n</text-to-summarise>'
+            'content': f'{prompt}? :: <text-to-summarise>\n\n{original_text}\n\n</text-to-summarise>'
         },
     ]
     response = await chatbot.chat(messages, temperature=1.0)
     page_summary = response.message[:1800] + "\n" + response.usage
+    if was_truncated:
+        page_summary = "[Note: The summary is based on a truncated version of the original text as it was too long.]\n\n" + page_summary
     await discord_message.reply(f"{page_summary}", mention_author=True)
 
 async def extract_recipe_from_webpage(discord_message: discord.Message, prompt: str, url: str) -> None:
